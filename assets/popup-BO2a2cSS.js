@@ -219,9 +219,10 @@ const deleteButtonHtml = (className, label, action, value) =>
 function tabItemHtml(tab) {
   const tabId = String(tab.id ?? '');
   const title = escapeHtml(tab.title);
+  const tabItemClass = tab.active ? 'tab-item is-active' : 'tab-item';
 
   return `
-    <li class="tab-item">
+    <li class="${tabItemClass}">
       <button type="button" class="tab-open-btn" data-action="open-tab" data-value="${tabId}">
         <div class="tab-icon-wrap" aria-hidden="true">${iconHtml('tab-icon', tab.iconUrl || FALLBACK_ICON_URL)}</div>
         <p class="tab-title" title="${title}">${title}</p>
