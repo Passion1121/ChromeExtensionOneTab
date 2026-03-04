@@ -5,6 +5,9 @@ type BrowserTab = {
   title?: string;
   favIconUrl?: string;
   url?: string;
+  active?: boolean;
+  index?: number;
+  windowId?: number;
 };
 
 type DomainGroup = {
@@ -24,6 +27,8 @@ function getDomain(url?: string): string {
   }
 }
 
+const COLLAPSE_THRESHOLD = 10;
+
 export default function App(): JSX.Element {
   const [tabs, setTabs] = useState<BrowserTab[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +43,10 @@ export default function App(): JSX.Element {
         id: tab.id,
         title: tab.title,
         favIconUrl: tab.favIconUrl,
-        url: tab.url
+        url: tab.url,
+        active: tab.active,
+        index: tab.index,
+        windowId: tab.windowId
       }))
     );
     setLoading(false);
@@ -48,10 +56,38 @@ export default function App(): JSX.Element {
     void loadTabs();
   }, []);
 
+  const keepPopupStableBeforeDelete = async (targetIds: number[]): Promise<void> => {
+    if (targetIds.length === 0) {
+      return;
+    }
+
+    const targetSet = new Set(targetIds);
+    const activeTarget = tabs.find((tab) => tab.active && tab.id !== undefined && targetSet.has(tab.id));
+    if (!activeTarget) {
+      return;
+    }
+
+    const fallback = tabs.find((tab) => tab.id !== undefined && !targetSet.has(tab.id));
+    if (fallback?.id !== undefined) {
+      await chrome.tabs.update(fallback.id, { active: true });
+      return;
+    }
+
+    const created = await chrome.tabs.create({
+      active: true,
+      url: 'about:blank'
+    });
+
+    if (created.id !== undefined) {
+      await chrome.tabs.update(created.id, { active: true });
+    }
+  };
+
   const handleDelete = async (tabId?: number) => {
     if (tabId === undefined) {
       return;
     }
+    await keepPopupStableBeforeDelete([tabId]);
     await chrome.tabs.remove(tabId);
     setTabs((prev) => prev.filter((tab) => tab.id !== tabId));
   };
@@ -71,11 +107,12 @@ export default function App(): JSX.Element {
       return;
     }
 
+    await keepPopupStableBeforeDelete(targetTabIds);
     await chrome.tabs.remove(targetTabIds);
     setTabs((prev) => prev.filter((tab) => getDomain(tab.url) !== domain));
   };
 
-  const shouldGroupByDomain = tabs.length > 15;
+  const shouldGroupByDomain = tabs.length > COLLAPSE_THRESHOLD;
 
   const domainGroups = useMemo<DomainGroup[]>(() => {
     const grouped = new Map<string, BrowserTab[]>();
@@ -101,6 +138,19 @@ export default function App(): JSX.Element {
       });
   }, [tabs]);
 
+  const foldableGroups = useMemo(
+    () => (shouldGroupByDomain ? domainGroups.filter((group) => group.tabs.length > 1) : []),
+    [domainGroups, shouldGroupByDomain]
+  );
+
+  const singleTabs = useMemo(
+    () =>
+      shouldGroupByDomain
+        ? domainGroups.filter((group) => group.tabs.length === 1).map((group) => group.tabs[0])
+        : tabs,
+    [domainGroups, shouldGroupByDomain, tabs]
+  );
+
   useEffect(() => {
     if (!shouldGroupByDomain) {
       setExpandedDomains({});
@@ -109,12 +159,12 @@ export default function App(): JSX.Element {
 
     setExpandedDomains((prev) => {
       const next: Record<string, boolean> = {};
-      for (const group of domainGroups) {
+      for (const group of foldableGroups) {
         next[group.domain] = prev[group.domain] ?? false;
       }
       return next;
     });
-  }, [domainGroups, shouldGroupByDomain]);
+  }, [foldableGroups, shouldGroupByDomain]);
 
   const toggleDomain = (domain: string) => {
     setExpandedDomains((prev) => ({
@@ -171,9 +221,9 @@ export default function App(): JSX.Element {
 
       {!loading && tabs.length > 0 && (
         <>
-          {shouldGroupByDomain ? (
+          {shouldGroupByDomain && foldableGroups.length > 0 && (
             <ul className="domain-list">
-              {domainGroups.map((group) => {
+              {foldableGroups.map((group) => {
                 const isExpanded = expandedDomains[group.domain];
                 return (
                   <li key={group.domain} className="domain-group">
@@ -221,11 +271,10 @@ export default function App(): JSX.Element {
                 );
               })}
             </ul>
-          ) : (
-            <ul className="tab-list">
-              {tabs.map((tab, index) => renderTabRow(tab, `${tab.id ?? tab.title ?? 'tab'}-${index}`))}
-            </ul>
           )}
+          <ul className={`tab-list ${shouldGroupByDomain && foldableGroups.length > 0 ? 'standalone-in-group' : ''}`}>
+            {singleTabs.map((tab, index) => renderTabRow(tab, `${tab.id ?? tab.title ?? 'tab'}-${index}`))}
+          </ul>
         </>
       )}
     </main>
