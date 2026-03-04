@@ -4,6 +4,7 @@ type BrowserTab = {
   id?: number;
   title?: string;
   favIconUrl?: string;
+  iconUrl?: string;
   url?: string;
   active?: boolean;
   index?: number;
@@ -28,11 +29,35 @@ function getDomain(url?: string): string {
 }
 
 const COLLAPSE_THRESHOLD = 10;
+const GOOGLE_FAVICON_URL = 'https://www.google.com/favicon.ico';
+
+function isNewTabUrl(url?: string): boolean {
+  if (!url) {
+    return true;
+  }
+  return (
+    url === 'about:blank' ||
+    url.startsWith('chrome://newtab') ||
+    url.startsWith('edge://newtab') ||
+    url.includes('newtab')
+  );
+}
+
+function getTabIconUrl(tab: Pick<BrowserTab, 'favIconUrl' | 'url'>): string | undefined {
+  if (tab.favIconUrl) {
+    return tab.favIconUrl;
+  }
+  if (isNewTabUrl(tab.url)) {
+    return GOOGLE_FAVICON_URL;
+  }
+  return undefined;
+}
 
 export default function App(): JSX.Element {
   const [tabs, setTabs] = useState<BrowserTab[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedDomains, setExpandedDomains] = useState<Record<string, boolean>>({});
+  const [pendingDeleteDomain, setPendingDeleteDomain] = useState<string | null>(null);
   const brandIconUrl = chrome.runtime.getURL('icons/icon-32.png');
 
   const loadTabs = async () => {
@@ -43,6 +68,7 @@ export default function App(): JSX.Element {
         id: tab.id,
         title: tab.title,
         favIconUrl: tab.favIconUrl,
+        iconUrl: getTabIconUrl({ favIconUrl: tab.favIconUrl, url: tab.url }),
         url: tab.url,
         active: tab.active,
         index: tab.index,
@@ -92,6 +118,17 @@ export default function App(): JSX.Element {
     setTabs((prev) => prev.filter((tab) => tab.id !== tabId));
   };
 
+  const handleActivateTab = async (tab: BrowserTab): Promise<void> => {
+    if (tab.id === undefined) {
+      return;
+    }
+
+    await chrome.tabs.update(tab.id, { active: true });
+    if (tab.windowId !== undefined) {
+      await chrome.windows.update(tab.windowId, { focused: true });
+    }
+  };
+
   const handleDeleteDomain = async (domain: string) => {
     const targetTabIds = tabs
       .filter((tab) => getDomain(tab.url) === domain)
@@ -102,14 +139,10 @@ export default function App(): JSX.Element {
       return;
     }
 
-    const confirmed = window.confirm(`确认删除 ${domain} 下全部 ${targetTabIds.length} 个标签页吗？`);
-    if (!confirmed) {
-      return;
-    }
-
     await keepPopupStableBeforeDelete(targetTabIds);
     await chrome.tabs.remove(targetTabIds);
     setTabs((prev) => prev.filter((tab) => getDomain(tab.url) !== domain));
+    setPendingDeleteDomain(null);
   };
 
   const shouldGroupByDomain = tabs.length > COLLAPSE_THRESHOLD;
@@ -128,7 +161,7 @@ export default function App(): JSX.Element {
       .map(([domain, domainTabs]) => ({
         domain,
         tabs: domainTabs,
-        iconUrl: domainTabs.find((tab) => Boolean(tab.favIconUrl))?.favIconUrl
+        iconUrl: domainTabs.find((tab) => Boolean(tab.iconUrl))?.iconUrl
       }))
       .sort((left, right) => {
         if (right.tabs.length !== left.tabs.length) {
@@ -166,6 +199,16 @@ export default function App(): JSX.Element {
     });
   }, [foldableGroups, shouldGroupByDomain]);
 
+  useEffect(() => {
+    if (!pendingDeleteDomain) {
+      return;
+    }
+    const stillExists = foldableGroups.some((group) => group.domain === pendingDeleteDomain);
+    if (!stillExists) {
+      setPendingDeleteDomain(null);
+    }
+  }, [foldableGroups, pendingDeleteDomain]);
+
   const toggleDomain = (domain: string) => {
     setExpandedDomains((prev) => ({
       ...prev,
@@ -175,12 +218,12 @@ export default function App(): JSX.Element {
 
   const renderTabRow = (tab: BrowserTab, key: string) => (
     <li key={key} className="tab-item">
-      <div className="tab-meta">
+      <button className="tab-open-btn" onClick={() => void handleActivateTab(tab)}>
         <div className="tab-icon-wrap" aria-hidden="true">
-          {tab.favIconUrl ? (
+          {tab.iconUrl ? (
             <img
               className="tab-icon"
-              src={tab.favIconUrl}
+              src={tab.iconUrl}
               alt=""
               referrerPolicy="no-referrer"
               onError={(event) => {
@@ -194,8 +237,15 @@ export default function App(): JSX.Element {
         <p className="tab-title" title={tab.title || ''}>
           {tab.title || 'Untitled'}
         </p>
-      </div>
-      <button className="delete-btn" aria-label="删除标签页" onClick={() => void handleDelete(tab.id)}>
+      </button>
+      <button
+        className="delete-btn"
+        aria-label="删除标签页"
+        onClick={(event) => {
+          event.stopPropagation();
+          void handleDelete(tab.id);
+        }}
+      >
         <svg viewBox="0 0 16 16" className="delete-icon" aria-hidden="true">
           <path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6" />
         </svg>
@@ -253,13 +303,36 @@ export default function App(): JSX.Element {
                       <button
                         className="domain-delete-btn"
                         aria-label={`删除 ${group.domain} 下全部标签`}
-                        onClick={() => void handleDeleteDomain(group.domain)}
+                        onClick={() => {
+                          setPendingDeleteDomain(group.domain);
+                        }}
                       >
                         <svg viewBox="0 0 16 16" className="delete-icon" aria-hidden="true">
                           <path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6" />
                         </svg>
                       </button>
                     </div>
+                    {pendingDeleteDomain === group.domain && (
+                      <div className="domain-confirm-row">
+                        <span className="domain-confirm-text">删除该分组全部标签？</span>
+                        <button
+                          className="confirm-btn"
+                          onClick={() => {
+                            void handleDeleteDomain(group.domain);
+                          }}
+                        >
+                          确认
+                        </button>
+                        <button
+                          className="cancel-btn"
+                          onClick={() => {
+                            setPendingDeleteDomain(null);
+                          }}
+                        >
+                          取消
+                        </button>
+                      </div>
+                    )}
                     {isExpanded && (
                       <ul className="tab-list grouped">
                         {group.tabs.map((tab, index) =>
