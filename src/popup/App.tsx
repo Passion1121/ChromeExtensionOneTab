@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type BrowserTab = {
   id?: number;
@@ -58,6 +58,11 @@ export default function App(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [expandedDomains, setExpandedDomains] = useState<Record<string, boolean>>({});
   const [pendingDeleteDomain, setPendingDeleteDomain] = useState<string | null>(null);
+  const [domainOrder, setDomainOrder] = useState<string[]>([]);
+  const [armedDragDomain, setArmedDragDomain] = useState<string | null>(null);
+  const [draggingDomain, setDraggingDomain] = useState<string | null>(null);
+  const [dragOverDomain, setDragOverDomain] = useState<string | null>(null);
+  const pressTimerRef = useRef<number | null>(null);
   const brandIconUrl = chrome.runtime.getURL('icons/icon-32.png');
 
   const loadTabs = async () => {
@@ -176,6 +181,13 @@ export default function App(): JSX.Element {
     [domainGroups, shouldGroupByDomain]
   );
 
+  const orderedFoldableGroups = useMemo(() => {
+    const groupMap = new Map(foldableGroups.map((group) => [group.domain, group]));
+    const ordered = domainOrder.map((domain) => groupMap.get(domain)).filter((group): group is DomainGroup => Boolean(group));
+    const missing = foldableGroups.filter((group) => !domainOrder.includes(group.domain));
+    return [...ordered, ...missing];
+  }, [domainOrder, foldableGroups]);
+
   const singleTabs = useMemo(
     () =>
       shouldGroupByDomain
@@ -200,6 +212,15 @@ export default function App(): JSX.Element {
   }, [foldableGroups, shouldGroupByDomain]);
 
   useEffect(() => {
+    setDomainOrder((prev) => {
+      const available = foldableGroups.map((group) => group.domain);
+      const kept = prev.filter((domain) => available.includes(domain));
+      const missing = available.filter((domain) => !kept.includes(domain));
+      return [...kept, ...missing];
+    });
+  }, [foldableGroups]);
+
+  useEffect(() => {
     if (!pendingDeleteDomain) {
       return;
     }
@@ -209,11 +230,52 @@ export default function App(): JSX.Element {
     }
   }, [foldableGroups, pendingDeleteDomain]);
 
+  useEffect(() => () => clearPressTimer(), []);
+
   const toggleDomain = (domain: string) => {
     setExpandedDomains((prev) => ({
       ...prev,
       [domain]: !prev[domain]
     }));
+  };
+
+  const clearPressTimer = () => {
+    if (pressTimerRef.current !== null) {
+      window.clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  };
+
+  const armDomainDrag = (domain: string) => {
+    clearPressTimer();
+    pressTimerRef.current = window.setTimeout(() => {
+      setArmedDragDomain(domain);
+    }, 220);
+  };
+
+  const disarmDomainDrag = () => {
+    clearPressTimer();
+    if (!draggingDomain) {
+      setArmedDragDomain(null);
+    }
+  };
+
+  const reorderDomains = (fromDomain: string, toDomain: string) => {
+    if (fromDomain === toDomain) {
+      return;
+    }
+
+    setDomainOrder((prev) => {
+      const next = [...prev];
+      const fromIndex = next.indexOf(fromDomain);
+      const toIndex = next.indexOf(toDomain);
+      if (fromIndex < 0 || toIndex < 0) {
+        return prev;
+      }
+      next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, fromDomain);
+      return next;
+    });
   };
 
   const renderTabRow = (tab: BrowserTab, key: string) => (
@@ -271,13 +333,62 @@ export default function App(): JSX.Element {
 
       {!loading && tabs.length > 0 && (
         <>
-          {shouldGroupByDomain && foldableGroups.length > 0 && (
+          {shouldGroupByDomain && orderedFoldableGroups.length > 0 && (
             <ul className="domain-list">
-              {foldableGroups.map((group) => {
+              {orderedFoldableGroups.map((group) => {
                 const isExpanded = expandedDomains[group.domain];
                 return (
-                  <li key={group.domain} className="domain-group">
+                  <li
+                    key={group.domain}
+                    className={`domain-group ${draggingDomain === group.domain ? 'is-dragging' : ''} ${
+                      dragOverDomain === group.domain && draggingDomain !== group.domain ? 'is-drag-over' : ''
+                    }`}
+                    draggable={armedDragDomain === group.domain}
+                    onDragStart={(event) => {
+                      if (armedDragDomain !== group.domain) {
+                        event.preventDefault();
+                        return;
+                      }
+                      event.dataTransfer.effectAllowed = 'move';
+                      event.dataTransfer.setData('text/plain', group.domain);
+                      setDraggingDomain(group.domain);
+                      setDragOverDomain(group.domain);
+                    }}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      if (draggingDomain && draggingDomain !== group.domain) {
+                        setDragOverDomain(group.domain);
+                      }
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const sourceDomain = event.dataTransfer.getData('text/plain') || draggingDomain;
+                      if (sourceDomain) {
+                        reorderDomains(sourceDomain, group.domain);
+                      }
+                      setDragOverDomain(null);
+                    }}
+                    onDragEnd={() => {
+                      setDraggingDomain(null);
+                      setDragOverDomain(null);
+                      setArmedDragDomain(null);
+                      clearPressTimer();
+                    }}
+                  >
                     <div className="domain-header">
+                      <button
+                        className={`domain-drag-handle ${armedDragDomain === group.domain ? 'armed' : ''}`}
+                        aria-label={`长按拖动 ${group.domain} 分组`}
+                        title="长按可拖动分组"
+                        onMouseDown={() => armDomainDrag(group.domain)}
+                        onMouseUp={disarmDomainDrag}
+                        onMouseLeave={disarmDomainDrag}
+                        onTouchStart={() => armDomainDrag(group.domain)}
+                        onTouchEnd={disarmDomainDrag}
+                        onTouchCancel={disarmDomainDrag}
+                      >
+                        ⋮⋮
+                      </button>
                       <button className="domain-toggle" onClick={() => toggleDomain(group.domain)}>
                         <span className={`domain-arrow ${isExpanded ? 'expanded' : ''}`}>▸</span>
                         <span className="domain-icon-wrap" aria-hidden="true">
@@ -345,7 +456,9 @@ export default function App(): JSX.Element {
               })}
             </ul>
           )}
-          <ul className={`tab-list ${shouldGroupByDomain && foldableGroups.length > 0 ? 'standalone-in-group' : ''}`}>
+          <ul
+            className={`tab-list ${shouldGroupByDomain && orderedFoldableGroups.length > 0 ? 'standalone-in-group' : ''}`}
+          >
             {singleTabs.map((tab, index) => renderTabRow(tab, `${tab.id ?? tab.title ?? 'tab'}-${index}`))}
           </ul>
         </>

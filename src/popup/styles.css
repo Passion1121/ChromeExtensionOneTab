@@ -108,12 +108,45 @@ body {
   box-shadow: 0 1px 4px rgba(21, 32, 61, 0.05);
 }
 
+.domain-group.is-dragging {
+  opacity: 0.55;
+}
+
+.domain-group.is-drag-over {
+  border-color: #8aa7f0;
+  box-shadow: 0 0 0 2px rgba(69, 116, 233, 0.18);
+}
+
 .domain-header {
   display: flex;
   align-items: center;
   gap: 7px;
   padding: 6px 8px 6px 6px;
   background: #f5f8ff;
+}
+
+.domain-drag-handle {
+  border: 1px solid #d6e0f4;
+  background: #ffffff;
+  color: #6b7b96;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  user-select: none;
+  font-size: 10px;
+  letter-spacing: -0.5px;
+  flex-shrink: 0;
+}
+
+.domain-drag-handle.armed {
+  border-color: #8da8ea;
+  color: #244381;
+  background: #edf3ff;
 }
 
 .domain-toggle {
