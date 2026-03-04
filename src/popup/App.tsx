@@ -10,6 +10,7 @@ type BrowserTab = {
 type DomainGroup = {
   domain: string;
   tabs: BrowserTab[];
+  iconUrl?: string;
 };
 
 function getDomain(url?: string): string {
@@ -54,6 +55,20 @@ export default function App(): JSX.Element {
     setTabs((prev) => prev.filter((tab) => tab.id !== tabId));
   };
 
+  const handleDeleteDomain = async (domain: string) => {
+    const targetTabIds = tabs
+      .filter((tab) => getDomain(tab.url) === domain)
+      .map((tab) => tab.id)
+      .filter((id): id is number => id !== undefined);
+
+    if (targetTabIds.length === 0) {
+      return;
+    }
+
+    await chrome.tabs.remove(targetTabIds);
+    setTabs((prev) => prev.filter((tab) => getDomain(tab.url) !== domain));
+  };
+
   const shouldGroupByDomain = tabs.length > 15;
 
   const domainGroups = useMemo<DomainGroup[]>(() => {
@@ -69,7 +84,8 @@ export default function App(): JSX.Element {
     return Array.from(grouped.entries())
       .map(([domain, domainTabs]) => ({
         domain,
-        tabs: domainTabs
+        tabs: domainTabs,
+        iconUrl: domainTabs.find((tab) => Boolean(tab.favIconUrl))?.favIconUrl
       }))
       .sort((left, right) => {
         if (right.tabs.length !== left.tabs.length) {
@@ -152,13 +168,39 @@ export default function App(): JSX.Element {
                 const isExpanded = expandedDomains[group.domain];
                 return (
                   <li key={group.domain} className="domain-group">
-                    <button className="domain-toggle" onClick={() => toggleDomain(group.domain)}>
-                      <span className={`domain-arrow ${isExpanded ? 'expanded' : ''}`}>▸</span>
-                      <span className="domain-name" title={group.domain}>
-                        {group.domain}
-                      </span>
-                      <span className="domain-count">{group.tabs.length}</span>
-                    </button>
+                    <div className="domain-header">
+                      <button className="domain-toggle" onClick={() => toggleDomain(group.domain)}>
+                        <span className={`domain-arrow ${isExpanded ? 'expanded' : ''}`}>▸</span>
+                        <span className="domain-icon-wrap" aria-hidden="true">
+                          {group.iconUrl ? (
+                            <img
+                              className="domain-icon"
+                              src={group.iconUrl}
+                              alt=""
+                              referrerPolicy="no-referrer"
+                              onError={(event) => {
+                                (event.currentTarget as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <span className="domain-icon-fallback" />
+                          )}
+                        </span>
+                        <span className="domain-name" title={group.domain}>
+                          {group.domain}
+                        </span>
+                        <span className="domain-count">{group.tabs.length}</span>
+                      </button>
+                      <button
+                        className="domain-delete-btn"
+                        aria-label={`删除 ${group.domain} 下全部标签`}
+                        onClick={() => void handleDeleteDomain(group.domain)}
+                      >
+                        <svg viewBox="0 0 16 16" className="delete-icon" aria-hidden="true">
+                          <path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6" />
+                        </svg>
+                      </button>
+                    </div>
                     {isExpanded && (
                       <ul className="tab-list grouped">
                         {group.tabs.map((tab, index) =>
