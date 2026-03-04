@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "TabDebt Manager",
+  "version": "1.0.0",
+  "description": "Manage tab debt with lifecycle states.",
+  "minimum_chrome_version": "114",
+  "permissions": ["tabs", "storage", "sidePanel"],
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Open TabDebt Manager"
+  },
+  "side_panel": {
+    "default_path": "dist/sidepanel.html"
+  }
+}
