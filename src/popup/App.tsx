@@ -63,7 +63,12 @@ export default function App(): JSX.Element {
   const [draggingDomain, setDraggingDomain] = useState<string | null>(null);
   const [dragOverDomain, setDragOverDomain] = useState<string | null>(null);
   const pressTimerRef = useRef<number | null>(null);
-  const brandIconUrl = chrome.runtime.getURL('icons/icon-32.png');
+  const brandIconCandidates = [
+    chrome.runtime.getURL('dist/icons/icon-32.png'),
+    chrome.runtime.getURL('icons/icon-32.png'),
+    chrome.runtime.getURL('public/icons/icon-32.png')
+  ];
+  const [brandIconUrl, setBrandIconUrl] = useState(brandIconCandidates[0]);
 
   const loadTabs = async () => {
     setLoading(true);
@@ -319,7 +324,17 @@ export default function App(): JSX.Element {
     <main className="popup-root">
       <header className="popup-header">
         <h1 className="brand-title">
-          <img src={brandIconUrl} className="brand-icon" alt="" />
+          <img
+            src={brandIconUrl}
+            className="brand-icon"
+            alt=""
+            onError={() => {
+              const currentIndex = brandIconCandidates.indexOf(brandIconUrl);
+              if (currentIndex >= 0 && currentIndex < brandIconCandidates.length - 1) {
+                setBrandIconUrl(brandIconCandidates[currentIndex + 1]);
+              }
+            }}
+          />
           <span>AetherTabs</span>
         </h1>
         <button className="refresh-btn" onClick={() => void loadTabs()}>
