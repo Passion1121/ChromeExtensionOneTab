@@ -1,39 +1,25 @@
 # AetherTabs
 
-Chrome extension project organized for Web Store upload with a single manifest.
+Chrome extension package (runtime-only layout) for Chrome Web Store upload.
 
-## Project Layout
+## Runtime Files
 
 - `manifest.json`: the only manifest file for extension runtime and packaging.
 - `popup.html`: popup entry.
 - `assets/`: bundled popup JS/CSS used by runtime.
 - `icons/`: extension icons used by runtime.
-- `src/`: source code.
-- `dist/`: build output (intermediate, not uploaded directly).
 
-## Build and Package
+## Web Store Upload
 
-1. Build and sync runtime files to root:
-
-```bash
-npm run build:runtime
-```
-
-2. Create Chrome Web Store zip package:
-
-```bash
-npm run package:webstore
-```
-
-Package output:
-
-- `release/aethertabs-webstore.zip`
-
-The generated zip includes only:
+Upload a zip that contains only:
 
 - `manifest.json`
 - `popup.html`
 - `assets/`
 - `icons/`
 
-This guarantees there is only one `manifest.json` in the upload package.
+On Linux/macOS, zip from project root:
+
+```bash
+zip -r aethertabs-webstore.zip manifest.json popup.html assets icons
+```
