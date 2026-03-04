@@ -1,12 +1,12 @@
 const COLLAPSE_THRESHOLD = 10;
 const LONG_PRESS_MS = 220;
-const NEWTAB_ICON_URL = 'https://www.google.com/favicon.ico';
 const DELETE_ICON_SVG =
   '<svg viewBox="0 0 16 16" class="delete-icon" aria-hidden="true"><path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6"></path></svg>';
 
 const manifestIcons = chrome.runtime.getManifest().icons ?? {};
 const BRAND_ICON_URL = chrome.runtime.getURL(manifestIcons['32'] || 'icons/icon-32.png');
 const FALLBACK_ICON_URL = chrome.runtime.getURL(manifestIcons['16'] || 'icons/icon-16.png');
+const FAVICON_SERVICE_URL = chrome.runtime.getURL('/_favicon/');
 
 const state = {
   tabs: [],
@@ -40,19 +40,21 @@ function getDomain(url) {
 }
 
 function getTabIconUrl(tab) {
+  const faviconUrl = new URL(FAVICON_SERVICE_URL);
+  faviconUrl.searchParams.set('size', '32');
+
   if (
     !tab.url ||
     tab.url === 'about:blank' ||
     tab.url.startsWith('chrome://newtab') ||
     tab.url.startsWith('edge://newtab')
   ) {
-    return NEWTAB_ICON_URL;
+    faviconUrl.searchParams.set('pageUrl', 'https://www.google.com');
+    return faviconUrl.toString();
   }
-  if (tab.favIconUrl) return tab.favIconUrl;
-  if (tab.url.startsWith('http://') || tab.url.startsWith('https://')) {
-    return `chrome://favicon2/?size=32&pageUrl=${encodeURIComponent(tab.url)}`;
-  }
-  return FALLBACK_ICON_URL;
+
+  faviconUrl.searchParams.set('pageUrl', tab.url);
+  return faviconUrl.toString();
 }
 
 const toViewTab = (tab) => ({
