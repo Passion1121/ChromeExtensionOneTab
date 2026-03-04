@@ -28,6 +28,7 @@ export default function App(): JSX.Element {
   const [tabs, setTabs] = useState<BrowserTab[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedDomains, setExpandedDomains] = useState<Record<string, boolean>>({});
+  const brandIconUrl = chrome.runtime.getURL('icons/icon-32.png');
 
   const loadTabs = async () => {
     setLoading(true);
@@ -62,6 +63,11 @@ export default function App(): JSX.Element {
       .filter((id): id is number => id !== undefined);
 
     if (targetTabIds.length === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm(`确认删除 ${domain} 下全部 ${targetTabIds.length} 个标签页吗？`);
+    if (!confirmed) {
       return;
     }
 
@@ -150,7 +156,10 @@ export default function App(): JSX.Element {
   return (
     <main className="popup-root">
       <header className="popup-header">
-        <h1>当前标签页</h1>
+        <h1 className="brand-title">
+          <img src={brandIconUrl} className="brand-icon" alt="" />
+          <span>AetherTabs</span>
+        </h1>
         <button className="refresh-btn" onClick={() => void loadTabs()}>
           刷新
         </button>

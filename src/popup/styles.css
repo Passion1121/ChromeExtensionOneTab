@@ -45,13 +45,26 @@ body {
   letter-spacing: 0.2px;
 }
 
+.brand-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.brand-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+}
+
 .refresh-btn {
   border: 1px solid #ccd8ff;
   background: #f9fbff;
   color: #2c3f76;
   border-radius: 999px;
-  font-size: 12px;
-  padding: 6px 11px;
+  font-size: 11px;
+  padding: 4px 8px;
+  line-height: 1.1;
   cursor: pointer;
 }
 
