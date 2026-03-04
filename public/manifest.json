@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "description": "A premium tab control workspace.",
   "minimum_chrome_version": "114",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; base-uri 'self'"
+  },
   "permissions": ["tabs"],
   "icons": {
     "16": "icons/icon-16.png",

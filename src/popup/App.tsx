@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 type BrowserTab = {
   id?: number;
   title?: string;
-  favIconUrl?: string;
   iconUrl?: string;
   url?: string;
   active?: boolean;
@@ -29,7 +28,6 @@ function getDomain(url?: string): string {
 }
 
 const COLLAPSE_THRESHOLD = 10;
-const GOOGLE_FAVICON_URL = 'https://www.google.com/favicon.ico';
 
 function isNewTabUrl(url?: string): boolean {
   if (!url) {
@@ -38,19 +36,26 @@ function isNewTabUrl(url?: string): boolean {
   return (
     url === 'about:blank' ||
     url.startsWith('chrome://newtab') ||
-    url.startsWith('edge://newtab') ||
-    url.includes('newtab')
+    url.startsWith('edge://newtab')
   );
 }
 
-function getTabIconUrl(tab: Pick<BrowserTab, 'favIconUrl' | 'url'>): string | undefined {
-  if (tab.favIconUrl) {
-    return tab.favIconUrl;
+function isHttpUrl(url?: string): boolean {
+  if (!url) {
+    return false;
   }
-  if (isNewTabUrl(tab.url)) {
-    return GOOGLE_FAVICON_URL;
+  return url.startsWith('http://') || url.startsWith('https://');
+}
+
+function getTabIconUrl(url: string | undefined, fallbackIconUrl: string): string {
+  if (!url || isNewTabUrl(url)) {
+    return fallbackIconUrl;
   }
-  return undefined;
+  if (isHttpUrl(url)) {
+    // Use browser internal favicon endpoint to avoid direct third-party icon requests.
+    return `chrome://favicon2/?size=32&pageUrl=${encodeURIComponent(url)}`;
+  }
+  return fallbackIconUrl;
 }
 
 export default function App(): JSX.Element {
@@ -63,12 +68,9 @@ export default function App(): JSX.Element {
   const [draggingDomain, setDraggingDomain] = useState<string | null>(null);
   const [dragOverDomain, setDragOverDomain] = useState<string | null>(null);
   const pressTimerRef = useRef<number | null>(null);
-  const brandIconCandidates = [
-    chrome.runtime.getURL('dist/icons/icon-32.png'),
-    chrome.runtime.getURL('icons/icon-32.png'),
-    chrome.runtime.getURL('public/icons/icon-32.png')
-  ];
-  const [brandIconUrl, setBrandIconUrl] = useState(brandIconCandidates[0]);
+  const manifestIcons = chrome.runtime.getManifest().icons ?? {};
+  const brandIconUrl = chrome.runtime.getURL(manifestIcons['32'] ?? 'icons/icon-32.png');
+  const fallbackTabIconUrl = chrome.runtime.getURL(manifestIcons['16'] ?? 'icons/icon-16.png');
 
   const loadTabs = async () => {
     setLoading(true);
@@ -77,8 +79,7 @@ export default function App(): JSX.Element {
       currentTabs.map((tab) => ({
         id: tab.id,
         title: tab.title,
-        favIconUrl: tab.favIconUrl,
-        iconUrl: getTabIconUrl({ favIconUrl: tab.favIconUrl, url: tab.url }),
+        iconUrl: getTabIconUrl(tab.url, fallbackTabIconUrl),
         url: tab.url,
         active: tab.active,
         index: tab.index,
@@ -324,17 +325,7 @@ export default function App(): JSX.Element {
     <main className="popup-root">
       <header className="popup-header">
         <h1 className="brand-title">
-          <img
-            src={brandIconUrl}
-            className="brand-icon"
-            alt=""
-            onError={() => {
-              const currentIndex = brandIconCandidates.indexOf(brandIconUrl);
-              if (currentIndex >= 0 && currentIndex < brandIconCandidates.length - 1) {
-                setBrandIconUrl(brandIconCandidates[currentIndex + 1]);
-              }
-            }}
-          />
+          <img src={brandIconUrl} className="brand-icon" alt="" />
           <span>AetherTabs</span>
         </h1>
         <button className="refresh-btn" onClick={() => void loadTabs()}>
