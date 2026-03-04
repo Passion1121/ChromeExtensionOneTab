@@ -1,6 +1,15 @@
 :root {
-  font-family: 'Segoe UI', 'PingFang SC', sans-serif;
+  font-family: 'Avenir Next', 'Segoe UI', 'PingFang SC', sans-serif;
   color: #1f2937;
+  --ink: #1f2937;
+  --muted: #6b7280;
+  --surface: #ffffff;
+  --line: #e5e7eb;
+  --bg-a: #eef6ff;
+  --bg-b: #f7f9fd;
+  --accent: #2254d8;
+  --danger: #b42318;
+  --danger-line: #f2b8b5;
 }
 
 * {
@@ -12,38 +21,44 @@ body {
   width: 420px;
   max-height: 560px;
   overflow: auto;
-  background: #f7f8fa;
+  background: linear-gradient(160deg, var(--bg-a), var(--bg-b));
 }
 
 .popup-root {
-  padding: 10px;
+  padding: 12px;
 }
 
 .popup-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid #dde8ff;
 }
 
 .popup-header h1 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
+  letter-spacing: 0.2px;
 }
 
 .refresh-btn {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  border-radius: 8px;
+  border: 1px solid #ccd8ff;
+  background: #f9fbff;
+  color: #2c3f76;
+  border-radius: 999px;
   font-size: 12px;
-  padding: 5px 10px;
+  padding: 6px 11px;
   cursor: pointer;
 }
 
 .state-text {
   margin: 8px 0;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--muted);
 }
 
 .tab-list {
@@ -60,42 +75,66 @@ body {
   gap: 10px;
   align-items: center;
   justify-content: space-between;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 9px 10px;
+  box-shadow: 0 2px 6px rgba(21, 32, 61, 0.06);
 }
 
 .tab-meta {
-  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex: 1;
+  min-width: 0;
 }
 
-.tab-title,
-.tab-url {
+.tab-icon-wrap {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: #f0f4ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.tab-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.tab-icon-fallback {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(140deg, #5f85ff, #294fcb);
+}
+
+.tab-title {
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.tab-title {
   font-size: 13px;
   font-weight: 600;
-}
-
-.tab-url {
-  margin-top: 2px;
-  font-size: 11px;
-  color: #6b7280;
+  color: var(--ink);
 }
 
 .delete-btn {
-  border: 1px solid #f0b7b4;
-  color: #b42318;
+  border: 1px solid var(--danger-line);
+  color: var(--danger);
   background: #fff;
-  border-radius: 8px;
+  border-radius: 999px;
   font-size: 12px;
-  padding: 6px 10px;
+  padding: 6px 11px;
   cursor: pointer;
+}
+
+.delete-btn:hover {
+  background: #fff4f3;
 }

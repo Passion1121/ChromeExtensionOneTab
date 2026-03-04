@@ -3,8 +3,7 @@ import { useEffect, useState } from 'react';
 type BrowserTab = {
   id?: number;
   title?: string;
-  url?: string;
-  pinned?: boolean;
+  favIconUrl?: string;
 };
 
 export default function App(): JSX.Element {
@@ -46,14 +45,25 @@ export default function App(): JSX.Element {
       {!loading && tabs.length > 0 && (
         <ul className="tab-list">
           {tabs.map((tab) => (
-            <li key={tab.id ?? `${tab.title}-${tab.url}`} className="tab-item">
+            <li key={tab.id ?? `${tab.title}-${tab.favIconUrl}`} className="tab-item">
               <div className="tab-meta">
-                <p className="tab-title" title={tab.title || tab.url || ''}>
-                  {tab.title || tab.url || 'Untitled'}
-                </p>
-                <p className="tab-url" title={tab.url || ''}>
-                  {tab.url || ''}
-                  {tab.pinned ? ' · pinned' : ''}
+                <div className="tab-icon-wrap" aria-hidden="true">
+                  {tab.favIconUrl ? (
+                    <img
+                      className="tab-icon"
+                      src={tab.favIconUrl}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      onError={(event) => {
+                        (event.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <span className="tab-icon-fallback" />
+                  )}
+                </div>
+                <p className="tab-title" title={tab.title || ''}>
+                  {tab.title || 'Untitled'}
                 </p>
               </div>
               <button className="delete-btn" onClick={() => void handleDelete(tab.id)}>
